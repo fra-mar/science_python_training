@@ -1,1 +1,2 @@
-Experimenting with sciences applied Python
+Experimenting with Python applied to science
+
