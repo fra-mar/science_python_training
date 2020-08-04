@@ -3,14 +3,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 v0=450
+tau_list=[0.5, 0.6, 0.7]
 tau=0.7
 tmax=3
 
 t=np.linspace(0,tmax,100)
-v=v0* np.exp(-t/tau)
+v=np.zeros((100,3))
+
+for i in range(0,3):
+    v[:,i] = v0* np.exp(-t /tau_list[i])
 
 fig=plt.figure()
 ax=fig.add_subplot(1,1,1)
+
 
 ax.plot(t,v)
 ax.hlines(0,xmin=0, xmax=tmax,ls=':',color='g')
