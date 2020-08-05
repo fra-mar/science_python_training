@@ -40,27 +40,46 @@ df_new.time=pd.to_datetime(df_new.time, format='%H:%M:%S')
 df_old.date=pd.to_datetime(df_old.date)
 df_old.time=pd.to_datetime(df_old.time, format='%H:%M:%S')
 
-df=pd.concat([df_old,df_new]).reset_index( drop=True)  #concatenate old+new single DF
-#data from 1922-1931 missing!!!!
 
+#concatenate old+new single DF.       data from 1922-1931 missing!!!!
+df=pd.concat([df_old,df_new]).reset_index( drop=True)  
 
+# 3 observations/day. They are summarized in df_date so just one / day
 df_date=df.groupby(df.date).mean().reset_index()  #mean daily obs/ day
 
 
-
-df_year=df_date.groupby(df_date.date.dt.year).mean().reset_index()  #mean year obs
+#mean temperature / year
+df_year=df_date.groupby(df_date.date.dt.year).mean().reset_index()
 df_year.temp[(df_year.date==1922) | (df_year.date==1879)] = 4.5  #according to another source
 
 #years with no data at all
+years = np.arange(1863,2021)
+
+years_in_df= np.array(df_year.date)
+
+missing=np.isin(years, years_in_df)
+
+missing_years = years[~missing]
+    
 dif= df_year.date.iloc[-1]- df_year.date.iloc[0]
-dif_len=dif-len(df_year)
+dif_len=len(missing_years)
  
 #years with insufficient data
 year_count=df_date.groupby(df_date.date.dt.year).count()
 years_incomplete=year_count[year_count.temp < 365].index.tolist()
 
+#drop years in df_years with incomplete data
 
-#%% Linear regression analysis
+n=df_year.date.isin(years_incomplete)
+
+to_drop=df_year.date[n].index.tolist()
+                     
+df_year.drop( to_drop, axis=0, inplace= True)
+
+
+
+
+#%% Linear regression analysis for year
 
 mymodel=sm.OLS(df_year.temp, df_year.date)
 
@@ -69,8 +88,10 @@ myresults=mymodel.fit()
 print (myresults.summary())
 
 
-#%% Plots
 
+#%% Plots for annual evolution
+
+print ('\n \n Years missing: ', missing_years,'\n')
 print ('Years with less than 365 days measured: ', years_incomplete)
 print ('{} whole years  missing'.format(dif_len))
 
@@ -103,3 +124,50 @@ print("""
       Short: linear regression model not reliable""")
 
 
+#%% Comparing each month, whole serie vs last years
+df_monthly=df_date.groupby(df.date.dt.month).mean()
+
+months=['jan','feb','mar','apr','maj','jun','jul','ago','sep','oct','nov','dec']
+
+df_monthly['std']=0
+for i in range (1,13):
+    df_monthly.temp.loc[i]=np.mean(df_date.temp[(df_date.date.dt.month==i)])
+    df_monthly['std'].loc[i]=np.std(df_date.temp[(df_date.date.dt.month==i)])
+    
+last=2000
+df_monthly_21=df_date[df_date.date.dt.year > last]
+df_monthly_21_b=df_monthly_21.groupby(df_monthly_21.date.dt.month).mean()
+
+df_monthly_21_b['std']=0
+for i in range (1,13):
+    df_monthly_21_b.temp.loc[i]=np.mean(df_date.temp[(df_date.date.dt.month==i)][df_date.date.dt.year>last])
+    df_monthly_21_b['std'].loc[i]=np.std(df_date.temp[(df_date.date.dt.month==i)][df_date.date.dt.year>last])
+
+
+#%% Plotting evolution by month, with std bars
+fig2=plt.figure()
+
+ax2=fig2.add_subplot(1,1,1)
+
+
+#Obs!...0.04 added to improve visualization so markers and error bars don't superimpose.
+ax2.errorbar(df_monthly.index +0.04, df_monthly.temp, marker='o', ls='',
+             yerr=df_monthly['std'], capsize=3, label='whole serie')
+
+ax2.errorbar(df_monthly_21_b.index -0.04, df_monthly_21_b.temp, marker='o', ls='',
+             yerr=df_monthly_21_b['std'] , capsize=3, label = 'After 2000')
+
+
+
+ax2.grid(axis='y')
+ax2.set_ylabel('Temp C')
+
+
+ti='Mean temp(daytime) by moth since 1863  in Uppsala'
+plt.title(ti)
+plt.legend(loc=2)
+
+#ax2_labels=[int(x)  for x in df_year.date[::10]]
+ax2.set_xticks(range(1,13))
+ax2.set_xticklabels(months)
+plt.show()    
