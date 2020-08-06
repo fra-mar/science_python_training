@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 import statsmodels.api as sm
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
+from scipy import stats
 
 np.printoptions(precision=3)
 pd.options.mode.chained_assignment = None   #prevent uncomfortable warning messages
@@ -45,11 +46,11 @@ df_old.time=pd.to_datetime(df_old.time, format='%H:%M:%S')
 df=pd.concat([df_old,df_new]).reset_index( drop=True)  
 
 # 3 observations/day. They are summarized in df_date so just one / day
-df_date=df.groupby(df.date).mean().reset_index()  #mean daily obs/ day
+df_date=df.groupby(df.date).median().reset_index()  #median daily obs/ day
 
 
-#mean temperature / year
-df_year=df_date.groupby(df_date.date.dt.year).mean().reset_index()
+#median temperature / year
+df_year=df_date.groupby(df_date.date.dt.year).median().reset_index()
 df_year.temp[(df_year.date==1922) | (df_year.date==1879)] = 4.5  #according to another source
 
 #years with no data at all
@@ -107,14 +108,14 @@ ax.grid(axis='y')
 ax.set_ylabel('Temp C')
 
 plt.legend(loc=2)
-ti='Mean annual temperatures (MAT) in Uppsala'
+ti='median annual temperatures (MAT) in Uppsala'
 plt.title(ti)
 
 
 ax_labels=[int(x)  for x in df_year.date[::10]]
 ax.set_xticks(range(0,len(df_year.temp),10))
 ax.set_xticklabels(ax_labels,rotation=45)
-plt.show()    #evolution of mean annual temperatures since 1944
+plt.show()    #evolution of median annual temperatures since 1944
 
 print("""
       Obs!!!
@@ -125,23 +126,27 @@ print("""
 
 
 #%% Comparing each month, whole serie vs last years
-df_monthly=df_date.groupby(df.date.dt.month).mean()
+df_monthly=df_date.groupby(df.date.dt.month).median()
 
 months=['jan','feb','mar','apr','maj','jun','jul','ago','sep','oct','nov','dec']
 
 df_monthly['std']=0
 for i in range (1,13):
-    df_monthly.temp.loc[i]=np.mean(df_date.temp[(df_date.date.dt.month==i)])
+    df_monthly.temp.loc[i]=np.median(df_date.temp[(df_date.date.dt.month==i)])
     df_monthly['std'].loc[i]=np.std(df_date.temp[(df_date.date.dt.month==i)])
     
 last=2000
 df_monthly_21=df_date[df_date.date.dt.year > last]
-df_monthly_21_b=df_monthly_21.groupby(df_monthly_21.date.dt.month).mean()
+df_monthly_21_b=df_monthly_21.groupby(df_monthly_21.date.dt.month).median()
 
 df_monthly_21_b['std']=0
+
 for i in range (1,13):
-    df_monthly_21_b.temp.loc[i]=np.mean(df_date.temp[(df_date.date.dt.month==i)][df_date.date.dt.year>last])
-    df_monthly_21_b['std'].loc[i]=np.std(df_date.temp[(df_date.date.dt.month==i)][df_date.date.dt.year>last])
+    df_monthly_21_b.temp.loc[i]=np.median(df_date.temp[
+        (df_date.date.dt.month==i)][df_date.date.dt.year>last])
+    
+    df_monthly_21_b['std'].loc[i]=np.std(df_date.temp[
+        (df_date.date.dt.month==i)][df_date.date.dt.year>last])
 
 
 #%% Plotting evolution by month, with std bars
@@ -151,10 +156,10 @@ ax2=fig2.add_subplot(1,1,1)
 
 
 #Obs!...0.04 added to improve visualization so markers and error bars don't superimpose.
-ax2.errorbar(df_monthly.index +0.04, df_monthly.temp, marker='o', ls='',
+ax2.errorbar(df_monthly.index -0.04, df_monthly.temp, marker='o', ls='',
              yerr=df_monthly['std'], capsize=3, label='whole serie')
 
-ax2.errorbar(df_monthly_21_b.index -0.04, df_monthly_21_b.temp, marker='o', ls='',
+ax2.errorbar(df_monthly_21_b.index +0.04, df_monthly_21_b.temp, marker='o', ls='',
              yerr=df_monthly_21_b['std'] , capsize=3, label = 'After 2000')
 
 
@@ -163,11 +168,34 @@ ax2.grid(axis='y')
 ax2.set_ylabel('Temp C')
 
 
-ti='Mean temp(daytime) by moth since 1863  in Uppsala'
+ti='median temp(daytime) by moth since 1863  in Uppsala'
 plt.title(ti)
 plt.legend(loc=2)
 
 #ax2_labels=[int(x)  for x in df_year.date[::10]]
 ax2.set_xticks(range(1,13))
 ax2.set_xticklabels(months)
-plt.show()    
+plt.show()   
+
+#%% Statiscal significance of monthly differences 2000s - whole serie
+
+#Wilcoxon rank sum (non normally distributed, independient variables)
+
+month_stats=np.zeros((12,3))
+
+for i in range(0,12):
+    y=df_date.temp[(df_date.date.dt.month==i+1) & (df_date.date.dt.year > 2000)]
+    x=df_date.temp[(df_date.date.dt.month==i+1)]
+    s, p= stats.ranksums(x,y)
+    month_stats[i][0]= i+1
+    month_stats[i][1]= np.median(y)-np.median(x)
+    month_stats[i][2]= p
+    
+print ('Wilkoxons sum rank test')
+print ('\nMonth     dif/month        p')
+
+aa=0
+for ii in month_stats:
+    aa=aa+1
+    print ('{}         {:.2f}        {:.4f}'.format(months[aa-1], ii[1], ii[2] ) )
+    
