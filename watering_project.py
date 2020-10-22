@@ -21,29 +21,6 @@ https://en.wikipedia.org/wiki/Rain#:~:
 text=One%20millimeter%20of%20rainfall%20is,8%2Din)%20metal%20varieties.
 """
 
-#%% get the weather forecast data from visualcrossing.com and 
-#write to a file
-#dataframe in pandas
-
-http.client.HTTPConnection._http_vsn = 10
-http.client.HTTPConnection._http_vsn_str = 'HTTP/1.0'
-
-#url="https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/forecast?aggregateHours=1&combinationMethod=aggregate&contentType=csv&unitGroup=metric&locationMode=single&key=4ABWPS4DREDJACGPF47FVM3NK&dataElements=default&locations=Uppsala"
-url='https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/forecast?aggregateHours=1&combinationMethod=aggregate&contentType=csv&unitGroup=metric&locationMode=single&key=4ABWPS4DREDJACGPF47FVM3NK&dataElements=default&locations=uppsala'
-print("Downloading...")
-resp = requests.get(url)
-with open('weather.csv', 'wb') as output:
-    output.write(resp.content)
-print("Done!")
-print ()
-
-df=pd.read_csv('weather.csv',header=0,  usecols=[1,5,6], nrows=36)
-
-df['date_time'] = pd.to_datetime (df['Date time'])
-
-df.drop ('Date time', axis=1, inplace= True)
-df.set_index(['date_time'], inplace=True)
-
 
 
 #%%  Plan when to open the valve for watering
@@ -54,29 +31,44 @@ valve='closed'
 
 #while True:
 
-now = datetime.now()
-
-
-
-if now.hour== 7 or now.hour==19:
-    print ('now')
-    http.client.HTTPConnection._http_vsn = 10
-    http.client.HTTPConnection._http_vsn_str = 'HTTP/1.0'
+delta=timedelta(seconds=30)  #just to check if while loop works, in the future while True
+nu=datetime.now()
+while nu+delta>datetime.now():
     
-   
-    url='https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/forecast?aggregateHours=1&combinationMethod=aggregate&contentType=csv&unitGroup=metric&locationMode=single&key=4ABWPS4DREDJACGPF47FVM3NK&dataElements=default&locations=uppsala'
-    print("Downloading...")
-    resp = requests.get(url)
-    with open('weather.csv', 'wb') as output:
-        output.write(resp.content)
-    print("Done!")
-    print ()
+    now = datetime.now()
+    now_string = datetime.strftime( now, '%I%M%S') #I for 12h format
     
-    df=pd.read_csv('weather.csv',header=0,  usecols=[1,5,6], nrows=24)
     
-    df['date_time'] = pd.to_datetime (df['Date time'])
     
-    df.drop ('Date time', axis=1, inplace= True)
-    df.set_index(['date_time'], inplace=True)
-else:
-    pass
+    if now_string == '062500':
+        print ('now')
+        http.client.HTTPConnection._http_vsn = 10
+        http.client.HTTPConnection._http_vsn_str = 'HTTP/1.0'
+        
+       
+        url='https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/forecast?aggregateHours=1&combinationMethod=aggregate&contentType=csv&unitGroup=metric&locationMode=single&key=4ABWPS4DREDJACGPF47FVM3NK&dataElements=default&locations=uppsala'
+        print("Downloading...")
+        resp = requests.get(url)
+        with open('weather.csv', 'wb') as output:
+            output.write(resp.content)
+        print("Done!")
+        print ()
+        
+        df=pd.read_csv('weather.csv',header=0,  usecols=[1,5,6], nrows=24)
+        
+        df['date_time'] = pd.to_datetime (df['Date time'])
+        
+        df.drop ('Date time', axis=1, inplace= True)
+        df.set_index(['date_time'], inplace=True)
+        
+        valve='open'
+        open_during=timedelta(seconds=1)   #opened just 5s for checking,  60s
+        while now + open_during > datetime.now():
+            valve='open'
+            print ('valve opened', datetime.now())
+            
+        valve='closed'; print ('closing valve')
+           
+        
+    else:
+        pass
